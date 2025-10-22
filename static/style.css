@@ -1,0 +1,9 @@
+body{font-family:Arial,Helvetica,sans-serif;background:#f3f4f6}
+.container{max-width:900px;margin:30px auto;background:#fff;padding:20px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+h2{margin:0 0 14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+label{font-size:13px;color:#222}
+input,textarea{padding:8px;border:1px solid #ccc;border-radius:4px;width:100%}
+.items{width:100%;border-collapse:collapse;margin-bottom:12px}
+.items th,.items td{border:1px solid #ddd;padding:6px;text-align:left}
+button{background:#1b6de0;color:#fff;border:none;padding:10px 12px;border-radius:6px;font-size:15px;cursor:pointer;width:100%}

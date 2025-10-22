@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PIPL Invoice Generator</title>
+<link rel="stylesheet" href="{{ url_for('static',filename='style.css') }}">
+</head>
+<body>
+<div class="container">
+<h2>Panchmahal Insulations Pvt. Ltd. — Invoice</h2>
+<form method="post" action="/generate">
+  <div class="grid">
+    <label>Invoice No</label><input name="invoice_no" required>
+    <label>e-Way Bill No</label><input name="eway_bill_no">
+    <label>Invoice Date</label><input name="invoice_date" required>
+    <label>Delivery Note</label><input name="delivery_note">
+    <label>Mode/Terms of Payment</label><input name="mode_payment">
+    <label>Buyer's Order No</label><input name="buyers_order_no">
+    <label>Buyer's Order Date</label><input name="buyers_order_date">
+    <label>Dispatch Doc No</label><input name="dispatch_doc_no">
+    <label>Delivery Note Date</label><input name="delivery_note_date">
+    <label>Dispatched through</label><input name="dispatched_through">
+    <label>Destination</label><input name="destination">
+    <label>Bill of Lading / LR-RR No</label><input name="bill_lading_no">
+    <label>Motor Vehicle No</label><input name="motor_vehicle_no">
+    <label>Buyer (Bill To)</label><textarea name="buyer_bill_to" rows="3"></textarea>
+    <label>Consignee (Ship To)</label><textarea name="consignee_ship_to" rows="3"></textarea>
+    <label>Terms of Delivery</label><input name="terms_delivery">
+  </div>
+  <h3>Items (up to 5)</h3>
+  <table class="items">
+    <thead><tr><th>Sl</th><th>Description</th><th>HSN/SAC</th><th>Qty</th><th>Rate</th><th>Per</th><th>Amount</th></tr></thead>
+    <tbody>
+      {% for i in range(1,6) %}
+      <tr>
+        <td><input name="slno_{{i}}" value="{{i}}" style="width:40px"></td>
+        <td><input name="desc_{{i}}"></td>
+        <td><input name="hsn_{{i}}"></td>
+        <td><input name="qty_{{i}}" value="0" style="width:60px"></td>
+        <td><input name="rate_{{i}}" value="0" style="width:80px"></td>
+        <td><input name="per_{{i}}" style="width:60px"></td>
+        <td><input name="amount_{{i}}" style="width:100px"></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="grid">
+    <label>HSN/SAC (Footer)</label><input name="hsn_footer">
+    <label>CGST Rate (%)</label><input name="cgst_rate" value="9%">
+    <label>SGST/UTGST Rate (%)</label><input name="sgst_rate" value="9%">
+    <label>Authorised Signatory</label><input name="authorised_sign" value="Authorised Signatory">
+  </div>
+  <button type="submit">Generate Invoice PDF</button>
+</form>
+</div>
+</body>
+</html>
