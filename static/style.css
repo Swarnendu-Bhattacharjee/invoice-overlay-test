@@ -1,9 +1,13 @@
 body{font-family:Arial,Helvetica,sans-serif;background:#f3f4f6}
-.container{max-width:900px;margin:30px auto;background:#fff;padding:20px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
-h2{margin:0 0 14px}
+.container{max-width:980px;margin:24px auto;background:#fff;padding:18px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+h2{margin:0 0 14px;font-size:20px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-label{font-size:13px;color:#222}
-input,textarea{padding:8px;border:1px solid #ccc;border-radius:4px;width:100%}
+label{font-size:13px;color:#222;display:block;margin-bottom:4px}
+input,textarea,select{padding:8px;border:1px solid #ccc;border-radius:4px;width:100%;box-sizing:border-box}
 .items{width:100%;border-collapse:collapse;margin-bottom:12px}
 .items th,.items td{border:1px solid #ddd;padding:6px;text-align:left}
-button{background:#1b6de0;color:#fff;border:none;padding:10px 12px;border-radius:6px;font-size:15px;cursor:pointer;width:100%}
+.items input{border:none;padding:4px}
+button{background:#1b6de0;color:#fff;border:none;padding:10px 12px;border-radius:6px;font-size:15px;cursor:pointer}
+#addItem{background:#28a745;margin:0;padding:8px 12px}
+.summary{margin-top:12px;padding:10px;background:#fafafa;border-radius:6px;display:flex;gap:20px;flex-wrap:wrap}
+.summary div{min-width:160px}

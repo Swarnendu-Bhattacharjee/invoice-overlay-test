@@ -8,7 +8,7 @@
 <body>
 <div class="container">
 <h2>Panchmahal Insulations Pvt. Ltd. — Invoice</h2>
-<form method="post" action="/generate">
+<form method="post" action="/generate" enctype="multipart/form-data" id="invForm">
   <div class="grid">
     <label>Invoice No</label><input name="invoice_no" required>
     <label>e-Way Bill No</label><input name="eway_bill_no">
@@ -23,35 +23,132 @@
     <label>Destination</label><input name="destination">
     <label>Bill of Lading / LR-RR No</label><input name="bill_lading_no">
     <label>Motor Vehicle No</label><input name="motor_vehicle_no">
-    <label>Buyer (Bill To)</label><textarea name="buyer_bill_to" rows="3"></textarea>
-    <label>Consignee (Ship To)</label><textarea name="consignee_ship_to" rows="3"></textarea>
+    <label>Buyer (Bill To)</label>
+    <div>
+      <input list="buyers" name="buyer_bill_to">
+      <datalist id="buyers">
+        {% for b in buyers %}
+        <option value="{{b}}"></option>
+        {% endfor %}
+      </datalist>
+    </div>
+    <label>Consignee (Ship To)</label>
+    <div>
+      <input list="consignees" name="consignee_ship_to">
+      <datalist id="consignees">
+        {% for c in consignees %}
+        <option value="{{c}}"></option>
+        {% endfor %}
+      </datalist>
+    </div>
     <label>Terms of Delivery</label><input name="terms_delivery">
   </div>
-  <h3>Items (up to 5)</h3>
-  <table class="items">
+
+  <h3>Items</h3>
+  <table class="items" id="itemsTable">
     <thead><tr><th>Sl</th><th>Description</th><th>HSN/SAC</th><th>Qty</th><th>Rate</th><th>Per</th><th>Amount</th></tr></thead>
     <tbody>
-      {% for i in range(1,6) %}
       <tr>
-        <td><input name="slno_{{i}}" value="{{i}}" style="width:40px"></td>
-        <td><input name="desc_{{i}}"></td>
-        <td><input name="hsn_{{i}}"></td>
-        <td><input name="qty_{{i}}" value="0" style="width:60px"></td>
-        <td><input name="rate_{{i}}" value="0" style="width:80px"></td>
-        <td><input name="per_{{i}}" style="width:60px"></td>
-        <td><input name="amount_{{i}}" style="width:100px"></td>
+        <td><input name="slno_1" value="1" readonly style="width:40px"></td>
+        <td><input name="desc_1"></td>
+        <td><input name="hsn_1" value="85149000"></td>
+        <td><input name="qty_1" value="0" class="qty" data-i="1" style="width:60px"></td>
+        <td><input name="rate_1" value="0" class="rate" data-i="1" style="width:80px"></td>
+        <td><input name="per_1" value="pcs" style="width:60px"></td>
+        <td><input name="amount_1" class="amount" data-i="1" style="width:100px" readonly></td>
       </tr>
-      {% endfor %}
     </tbody>
   </table>
+  <div style="margin:8px 0 18px">
+    <button id="addItem" type="button">+ Add Item</button>
+  </div>
+
   <div class="grid">
-    <label>HSN/SAC (Footer)</label><input name="hsn_footer">
+    <label>HSN/SAC (Footer)</label><input name="hsn_footer" value="85149000">
     <label>CGST Rate (%)</label><input name="cgst_rate" value="9%">
     <label>SGST/UTGST Rate (%)</label><input name="sgst_rate" value="9%">
-    <label>Authorised Signatory</label><input name="authorised_sign" value="Authorised Signatory">
+    <label>Authorised Signatory Name</label><input name="authorised_sign" value="Authorised Signatory">
   </div>
+
+  <div style="display:flex;gap:10px;align-items:center;margin:10px 0">
+    <label>Upload Signature (png/jpg)</label>
+    <input type="file" name="authorised_sign_file" accept="image/*">
+  </div>
+
+  <div class="summary">
+    <div>Total (Taxable): <span id="taxableTotal">0.00</span></div>
+    <div>CGST: <span id="cgstAmt">0.00</span></div>
+    <div>SGST: <span id="sgstAmt">0.00</span></div>
+    <div>Grand Total: <span id="grandTotal">0.00</span></div>
+    <div>Amount (in words): <span id="wordsTop"></span></div>
+  </div>
+
   <button type="submit">Generate Invoice PDF</button>
 </form>
 </div>
+
+<script>
+let maxItems=5;
+document.getElementById('addItem').addEventListener('click',function(){
+  let tbody=document.querySelector('#itemsTable tbody');
+  let rows=tbody.querySelectorAll('tr').length;
+  if(rows>=maxItems) return;
+  let idx=rows+1;
+  let tr=document.createElement('tr');
+  tr.innerHTML = `<td><input name="slno_${idx}" value="${idx}" readonly style="width:40px"></td>
+    <td><input name="desc_${idx}"></td>
+    <td><input name="hsn_${idx}" value="85149000"></td>
+    <td><input name="qty_${idx}" value="0" class="qty" data-i="${idx}" style="width:60px"></td>
+    <td><input name="rate_${idx}" value="0" class="rate" data-i="${idx}" style="width:80px"></td>
+    <td><input name="per_${idx}" style="width:60px"></td>
+    <td><input name="amount_${idx}" class="amount" data-i="${idx}" style="width:100px" readonly></td>`;
+  tbody.appendChild(tr);
+  attachRowListeners();
+});
+function attachRowListeners(){
+  document.querySelectorAll('.qty,.rate').forEach(el=> el.oninput = recalcAll);
+}
+function recalcAll(){
+  let rows=document.querySelectorAll('#itemsTable tbody tr');
+  let taxable=0.00;
+  rows.forEach((r, index)=>{
+    let i=index+1;
+    let q=document.querySelector(`[name="qty_${i}"]`);
+    let rrate=document.querySelector(`[name="rate_${i}"]`);
+    let am=document.querySelector(`[name="amount_${i}"]`);
+    let qv=parseFloat(q?.value||0) || 0;
+    let rv=parseFloat(rrate?.value||0) || 0;
+    let val = +(qv*rv).toFixed(2);
+    if(am) am.value = val.toFixed(2);
+    taxable += val;
+  });
+  document.getElementById('taxableTotal').innerText = taxable.toFixed(2);
+  let cgstP = parseFloat(document.querySelector('[name="cgst_rate"]').value.replace('%','')) || 0;
+  let sgstP = parseFloat(document.querySelector('[name="sgst_rate"]').value.replace('%','')) || 0;
+  let cg = +(taxable * cgstP / 100).toFixed(2);
+  let sg = +(taxable * sgstP / 100).toFixed(2);
+  let grand = +(taxable + cg + sg).toFixed(2);
+  document.getElementById('cgstAmt').innerText = cg.toFixed(2);
+  document.getElementById('sgstAmt').innerText = sg.toFixed(2);
+  document.getElementById('grandTotal').innerText = grand.toFixed(2);
+  fetch('/_numtowords?num=' + encodeURIComponent(Math.round(grand)))
+    .then(r=>r.text())
+    .then(txt => {
+      document.getElementById('wordsTop').innerText = txt;
+    });
+}
+attachRowListeners();
+document.getElementById('invForm').addEventListener('submit', function(e){
+  let rows=document.querySelectorAll('#itemsTable tbody tr').length;
+  for(let i=1;i<=rows;i++){
+    let am = document.querySelector(`[name="amount_${i}"]`);
+    if(am && !am.value){
+      let q = parseFloat(document.querySelector(`[name="qty_${i}"]`).value||0) || 0;
+      let r = parseFloat(document.querySelector(`[name="rate_${i}"]`).value||0) || 0;
+      am.value = (q*r).toFixed(2);
+    }
+  }
+});
+</script>
 </body>
 </html>
