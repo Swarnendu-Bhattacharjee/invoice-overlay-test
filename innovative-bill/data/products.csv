@@ -1,0 +1,2 @@
+invoice_id,product_id,product_name,hsn,qty,rate,amount
+123456,1,Foundry Sleeve,6909,100,50,5000

@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Coord Picker — PIPL Invoice</title>
+<style>
+  html,body{height:100%;margin:0;font-family:Arial,sans-serif;background:#efefef}
+  #container{height:100%;display:flex;flex-direction:column}
+  #topbar{height:56px;display:flex;align-items:center;gap:12px;padding:8px 16px;background:#1f2937;color:#fff}
+  #topbar .label{font-weight:600}
+  #controls{margin-left:auto;display:flex;gap:8px;align-items:center}
+  button{background:#0ea5a4;border:none;color:#fff;padding:8px 10px;border-radius:6px;cursor:pointer}
+  button.secondary{background:#64748b}
+  #stage{flex:1;position:relative;display:flex;gap:0;overflow:hidden}
+  iframe#preview{flex:1;border:0;width:100%;height:100%}
+  /* overlay for cursor coords and pins */
+  .overlay{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none}
+  .cursor-hint{
+    position:absolute;
+    transform:translate(12px,-12px);
+    pointer-events:none;
+    background:rgba(0,0,0,0.75);
+    color:#fff;padding:4px 8px;border-radius:6px;font-size:13px;white-space:nowrap;
+    box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  }
+  .pin{
+    position:absolute;
+    width:14px;height:14px;border-radius:50%;
+    background:#ef4444;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);
+    transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;
+  }
+  .pin-label{
+    position:absolute;transform:translate(10px,-50%);
+    background:#111;color:#fff;padding:2px 6px;border-radius:4px;font-size:12px;
+    white-space:nowrap;pointer-events:none;
+  }
+  #log{height:120px;overflow:auto;background:#fff;border-top:1px solid #ddd;padding:8px;font-size:13px}
+  #log pre{margin:0;font-family:monospace;font-size:13px}
+  .hint {font-size:12px;opacity:0.9}
+</style>
+</head>
+<body>
+<div id="container">
+  <div id="topbar">
+    <div class="label">Coord Picker — PIPL Invoice</div>
+    <div class="hint">Opened template: <strong>tally_invoice_template.html</strong> (your file). </div>
+    <div id="controls">
+      <button id="clearPins" class="secondary">Clear pins</button>
+      <button id="exportPins">Copy pins (CSV)</button>
+      <button id="help">Help</button>
+    </div>
+  </div>
+
+  <div id="stage">
+    <!-- load user's HTML converted from PDF -->
+    <iframe id="preview" src="../tally_invoice_template.html"></iframe>
+
+    <!-- overlay layer -->
+    <div class="overlay" id="overlay">
+      <div id="cursorHint" class="cursor-hint" style="display:none"></div>
+    </div>
+  </div>
+
+  <div id="log">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div><strong>Picked coordinates</strong> — click anywhere on the document to pin. Pins are recorded relative to the document content (in pixels).</div>
+      <div class="hint">Tip: ensure browser zoom = 100% for accurate pixel mapping.</div>
+    </div>
+    <pre id="logArea">No pins yet.</pre>
+  </div>
+</div>
+
+<script>
+/*
+  How this works:
+  - The iframe displays your converted HTML (pdf2htmlEX output).
+  - We listen to mouse movements on the iframe area and compute coordinates relative
+    to the visible document area inside the iframe.
+  - Click to "pin" and save a coordinate (x, y, page). Pins show near the click.
+  - Export copies pins as CSV to clipboard.
+*/
+const iframe = document.getElementById('preview');
+const overlay = document.getElementById('overlay');
+const cursorHint = document.getElementById('cursorHint');
+const logArea = document.getElementById('logArea');
+
+let pins = [];
+
+// helper to format
+function fmt(n){ return Math.round(n); }
+
+// map page-relative coords:
+// We attempt two strategies:
+//  1) If iframe content has an element with id "page-container" (pdf2htmlEX), use its bounding box
+//  2) Otherwise fallback to the full iframe viewport
+function getContentRect() {
+  const ifr = iframe;
+  try {
+    const doc = ifr.contentDocument || ifr.contentWindow.document;
+    const pageContainer = doc.getElementById('page-container') || doc.querySelector('body');
+    if (!pageContainer) {
+      // fallback to iframe rect in viewport
+      return { rect: ifr.getBoundingClientRect(), doc, pageContainer: null };
+    }
+    // pageContainer might be positioned inside; get its rect relative to viewport
+    const pageRect = pageContainer.getBoundingClientRect();
+    return { rect: pageRect, doc, pageContainer };
+  } catch (e) {
+    // cross-origin or not yet ready -> return iframe viewport rect
+    return { rect: iframe.getBoundingClientRect(), doc: null, pageContainer: null };
+  }
+}
+
+// show cursor hint near mouse
+function positionCursorHint(x, y, text) {
+  cursorHint.style.left = x + 'px';
+  cursorHint.style.top = y + 'px';
+  cursorHint.textContent = text;
+  cursorHint.style.display = 'block';
+}
+
+function hideCursorHint(){ cursorHint.style.display = 'none'; }
+
+// update log text
+function refreshLog(){
+  if (pins.length === 0) {
+    logArea.textContent = 'No pins yet.';
+    return;
+  }
+  const lines = pins.map((p,i)=>`${i+1}, page=${p.page}, x=${fmt(p.x)}, y=${fmt(p.y)}, note=${p.note||''}`);
+  logArea.textContent = lines.join('\\n');
+}
+
+// place a pin element on overlay at overlay coords
+function addPinVisual(px, py, info) {
+  const pin = document.createElement('div');
+  pin.className = 'pin';
+  pin.style.left = px + 'px';
+  pin.style.top = py + 'px';
+  pin.title = `x:${fmt(info.x)} y:${fmt(info.y)} page:${info.page}`;
+  pin.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    // on pin click copy single pin to clipboard
+    const text = `x=${fmt(info.x)},y=${fmt(info.y)},page=${info.page}`;
+    navigator.clipboard?.writeText(text).then(()=>alert('Pin copied: '+text), ()=>alert('Clipboard failed'));
+  });
+  const lbl = document.createElement('div');
+  lbl.className = 'pin-label';
+  lbl.textContent = `#${pins.length}`;
+  pin.appendChild(lbl);
+  overlay.appendChild(pin);
+  return pin;
+}
+
+// handle mouse move (over stage)
+function handleMouseMove(event) {
+  const st = iframe.getBoundingClientRect();
+  const ox = event.clientX;
+  const oy = event.clientY;
+  // we show hint in overlay coords directly
+  positionCursorHint(ox, oy, `x:${fmt(ox - st.left)} y:${fmt(oy - st.top)}`);
+}
+
+// compute coords relative to page content (accounting for zoom/scale)
+function computeCoords(clientX, clientY) {
+  const info = getContentRect();
+  const rect = info.rect;
+  // if pageContainer exists, try compute page number by looking at data-page-no under mouse
+  let pageNo = null;
+  if (info.doc && info.pageContainer) {
+    // find element with class pf that contains the point
+    const pfs = info.doc.querySelectorAll('.pf');
+    for (const pf of pfs) {
+      const r = pf.getBoundingClientRect();
+      if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) {
+        pageNo = pf.getAttribute('data-page-no') || null;
+        // compute coords relative to the pf top-left
+        const rx = clientX - r.left;
+        const ry = clientY - r.top;
+        return { x: rx, y: ry, page: pageNo || 1, rect: r };
+      }
+    }
+  }
+  // fallback: coords relative to pageRect (or iframe viewport)
+  const rx = clientX - rect.left;
+  const ry = clientY - rect.top;
+  return { x: rx, y: ry, page: 1, rect: rect };
+}
+
+// wait until iframe loads (optional)
+iframe.addEventListener('load', () => {
+  // try to set cursor to crosshair inside iframe by injecting CSS if same-origin
+  try {
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    const s = doc.createElement('style');
+    s.innerHTML = 'body, #page-container { cursor: crosshair !important; }';
+    doc.head.appendChild(s);
+  } catch (e) {
+    // ignore cross-origin
+  }
+});
+
+// stage-level mouse handling
+const stage = document.getElementById('stage');
+stage.addEventListener('mousemove', handleMouseMove);
+stage.addEventListener('mouseleave', hideCursorHint);
+
+// Click to pin
+stage.addEventListener('click', (ev) => {
+  const cx = ev.clientX;
+  const cy = ev.clientY;
+  const result = computeCoords(cx, cy);
+  // convert content rect -> overlay coordinates
+  // overlay uses viewport coords, so place pin at clientX/clientY
+  const overlayX = cx;
+  const overlayY = cy;
+  // add pin to pins list (store page + content-relative coords)
+  const pinInfo = { x: result.x, y: result.y, page: result.page, note: '' };
+  pins.push(pinInfo);
+  addPinVisual(overlayX, overlayY, pinInfo);
+  refreshLog();
+});
+
+// clear pins
+document.getElementById('clearPins').addEventListener('click', ()=> {
+  pins = [];
+  // remove visuals
+  const existing = overlay.querySelectorAll('.pin');
+  existing.forEach(n=>n.remove());
+  refreshLog();
+});
+
+// export pins as CSV to clipboard
+document.getElementById('exportPins').addEventListener('click', async () => {
+  if (pins.length === 0) { alert('No pins to export'); return; }
+  const csv = ['idx,page,x,y,note', ...pins.map((p,i)=>`${i+1},${p.page},${fmt(p.x)},${fmt(p.y)},"${(p.note||'').replace(/"/g,'""')}"`)].join('\\n');
+  try {
+    await navigator.clipboard.writeText(csv);
+    alert('Pins copied as CSV to clipboard (ready to paste).');
+  } catch (e) {
+    // fallback: show csv content for manual copy
+    const w = window.open('', '_blank', 'width=600,height=400');
+    w.document.body.innerHTML = `<pre>${csv.replace(/</g,'&lt;')}</pre>`;
+  }
+});
+
+// help button
+document.getElementById('help').addEventListener('click', ()=>{
+  alert('How to use:\\n\\n1) Ensure browser zoom = 100%.\\n2) Click anywhere on the document to pin coordinates.\\n3) Click "Copy pins (CSV)" to copy coords to clipboard.\\n4) Pins are listed as: index,page,x,y,note\\n\\nTip: If your converted HTML shows multiple pages, the script will attempt to detect the page via the page frame elements created by pdf2htmlEX.');
+});
+</script>
+</body>
+</html>

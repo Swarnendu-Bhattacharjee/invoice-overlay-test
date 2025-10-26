@@ -1,0 +1,2 @@
+invoice_id,customer_id,product_id,transporter_id,date,total,cgst_rate,sgst_rate,cgst_amount,sgst_amount,grand_total,amount_words
+123456,1,1,1,2025-10-22,5000,9,9,450,450,5900,"Five Thousand Nine Hundred Only"
