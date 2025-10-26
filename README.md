@@ -1,7 +1,3 @@
----
-```markdown
-# 📍 Invoice Overlay Calibration Utility
-
 ### Overview
 The **Invoice Overlay Test** project provides an advanced interface for **PDF coordinate calibration** and **overlay testing** for invoice generation systems.  
 It enables precise mapping of text and field coordinates (customer name, invoice number, amount, etc.) on a base PDF layout — such as company invoice templates — to ensure **pixel-perfect rendering** of generated invoices.
