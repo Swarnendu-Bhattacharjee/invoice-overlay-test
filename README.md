@@ -1,7 +1,4 @@
 ---
-
-### 🧾 **README.md — Invoice Overlay Test**
-
 ```markdown
 # 📍 Invoice Overlay Calibration Utility
 
