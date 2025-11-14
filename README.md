@@ -172,7 +172,7 @@ All usage and redistribution must adhere to internal developer policies.
 
 ## 👨‍💻 Maintainer
 
-**Swarnendu Bhattacharjee (Sentinel)**
+**Swarnendu Bhattacharjee**
 Developer, AI & Backend Systems — *PIPL Accounting Software Division*
 📧 [Contact available on GitHub Profile](https://github.com/Swarnendu-Bhattacharjee)
 
